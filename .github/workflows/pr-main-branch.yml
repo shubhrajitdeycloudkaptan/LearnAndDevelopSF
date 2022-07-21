@@ -43,9 +43,7 @@ jobs:
           run: sfdx force:source:push
         - name: 'Scan code'
           run: |
-              cd changed-sources
-              sfdx scanner:run --format sarif --target './**/*.cls' --category "Design,Best Practices,Performance" --outfile 'apexScanResults.sarif'  
-              cd ..
+              sfdx scanner:run --format sarif --target force-app/main --normalize-severity -c "Security,Best Practices,Performance,Code Style,Design,Error Prone,ECMAScript 6,Possible Errors,Variables,Stylistic Issues" --outfile 'apexScanResults.sarif'
         - name: Upload SARIF file
           uses: github/codeql-action/upload-sarif@v1
           with:
