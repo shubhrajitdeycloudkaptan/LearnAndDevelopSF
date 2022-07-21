@@ -1,98 +1,56 @@
-# This is a basic workflow to help you get started with Actions
-
 name: Validate PR on Master Branch
-
-# Controls when the workflow will run
 on:
-    # The workflow will run whenever an event happens on a pull request
   pull_request:
-      # The events are that a PR is opened, or when a commit is pushed
-      # to a branch that has an existing pull request
     types: [opened, synchronize]
-      # The branches filter allows to specify that this workflow should only
-      # run if the branch name is "master". This way we prevent this workflow
-      # from running when PRs are opened on other branches
-    branches: master
-      # We only care about changes to the force-app directory, which is the
-      # root directory of the sfdx project. This prevents the job from running
-      # when changing non-salesforce files (like this yml file).
+    branches: [ master ]
     paths:
       - 'force-app/**'
-
-# A workflow run is made up of one or more jobs that can run sequentially or in parallel
 jobs:
-  # This is the name of the job. You can give it whatever name you want
-  validate-deployment-on-develop-org:
-    # The type of runner that the job will run on
-    runs-on: ubuntu-latest
-    # if: ${{ github.actor != 'dependabot[bot]' }}
-    # Steps represent a sequence of tasks that will be executed as part of the job
-    steps:
-    # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
-    - name: 'Checkout source code'
-    - uses: actions/checkout@v2
-    # Now Install Salesforce CLI
-    - name: 'Install Salesforce CLI'
-      run: |
-          wget https://developer.salesforce.com/media/salesforce-cli/sfdx/channels/stable/sfdx-linux-x64.tar.xz
-          mkdir ~/sfdx
-          tar xJf sfdx-linux-x64.tar.xz -C ~/sfdx --strip-components 1
-          echo "$HOME/sfdx/bin" >> $GITHUB_PATH
-          ~/sfdx/bin/sfdx version
-    # Then we install the SFDX-Git-Delta plugin - https://github.com/scolladon/sfdx-git-delta
-    # This is an awesome plugin that allows us to extract a package.xml with the metadata
-    # that has changed between commits. I highly recommend going over the github readme 
-    # for more information on how this works.
-
-    - name: 'Installing sfdx git delta'
-      run: | 
-          echo y | sfdx plugins:install sfdx-git-delta
-          sfdx plugins 
-    # Install java as it is required for the next step
-    - name: 'Installing java'
-      run: sudo apt-get install openjdk-8-jdk
-
-    # Install SFDX scanner
-    - name: 'Installing SFDX scanner'
-      run: sfdx plugins:install @salesforce/sfdx-scanner
-    # Store secret for dev hub
-    - name: 'Populate auth file with DEVHUB_SFDX_URL secret'
-      shell: bash
-      run: |
-          echo ${{ secrets.DEVHUB_SFDX_URL}} > ./DEVHUB_SFDX_URL.txt
-          secretFileSize=$(wc -c "./DEVHUB_SFDX_URL.txt" | awk '{print $1}')
-          if [ $secretFileSize == 1 ]; then
-              echo "Missing DEVHUB_SFDX_URL secret. Is this workflow running on a fork?";
-              exit 1;
-          fi
-                
-    # Authenticate dev hub
-    - name: 'Authenticate Dev Hub'
-      run: sfdx auth:sfdxurl:store -f ./DEVHUB_SFDX_URL.txt -a devhub -d
-
-    # Create scratch org
-    - name: 'Create scratch org'
-      run: sfdx force:org:create -f config/project-scratch-def.json -a scratch-org -s -d 1
-
-    # Deploy source to scratch org
-    - name: 'Push source to scratch org'
-      run: sfdx force:source:push
-
-    # The .sarif file can later be uploaded to github, so that we can see the 
-    # results of the scan directly from the PR.
-
-    - name: 'Scan code'
-      run: |
-          cd changed-sources
-          sfdx scanner:run --format sarif --target './**/*.cls' --category "Design,Best Practices,Performance" --outfile 'apexScanResults.sarif'  
-          cd ..
-    # Now we upload the .sarif file as explained in the previous step
-    - name: Upload SARIF file
-      uses: github/codeql-action/upload-sarif@v1
-      with:
-        sarif_file: changed-sources/apexScanResults.sarif
-    # Housekeeping
-    - name: 'Delete scratch org'
-      if: always()
-      run: sfdx force:org:delete -p -u scratch-org
+    validate-deployment-on-develop-org:
+      runs-on: ubuntu-latest
+      steps:
+        - name: 'Checkout source code'
+          uses: actions/checkout@v2
+        - name: 'Install Salesforce CLI'
+          run: |
+              wget https://developer.salesforce.com/media/salesforce-cli/sfdx/channels/stable/sfdx-linux-x64.tar.xz
+              mkdir ~/sfdx
+              tar xJf sfdx-linux-x64.tar.xz -C ~/sfdx --strip-components 1
+              echo "$HOME/sfdx/bin" >> $GITHUB_PATH
+              ~/sfdx/bin/sfdx version
+        - name: 'Installing sfdx git delta'
+          run: | 
+              echo y | sfdx plugins:install sfdx-git-delta
+              sfdx plugins 
+        - name: 'Installing java'
+          run: sudo apt-get install openjdk-8-jdk
+        - name: 'Installing SFDX scanner'
+          run: sfdx plugins:install @salesforce/sfdx-scanner
+        - name: 'Populate auth file with DEVHUB_SFDX_URL secret'
+          shell: bash
+          run: |
+              echo ${{ secrets.DEVHUB_SFDX_URL}} > ./DEVHUB_SFDX_URL.txt
+              secretFileSize=$(wc -c "./DEVHUB_SFDX_URL.txt" | awk '{print $1}')
+              if [ $secretFileSize == 1 ]; then
+                  echo "Missing DEVHUB_SFDX_URL secret. Is this workflow running on a fork?";
+                  exit 1;
+              fi
+        - name: 'Authenticate Dev Hub'
+          run: sfdx auth:sfdxurl:store -f ./DEVHUB_SFDX_URL.txt -a devhub -d
+        - name: 'Create scratch org'
+          run: sfdx force:org:create -f config/project-scratch-def.json -a scratch-org -s -d 1
+        - name: 'Push source to scratch org'
+          run: sfdx force:source:push
+        - name: 'Scan code'
+          run: |
+              cd changed-sources
+              sfdx scanner:run --format sarif --target './**/*.cls' --category "Design,Best Practices,Performance" --outfile 'apexScanResults.sarif'  
+              cd ..
+        - name: Upload SARIF file
+          uses: github/codeql-action/upload-sarif@v1
+          with:
+            sarif_file: changed-sources/apexScanResults.sarif
+        - name: 'Delete scratch org'
+          if: always()
+          run: sfdx force:org:delete -p -u scratch-org
 
