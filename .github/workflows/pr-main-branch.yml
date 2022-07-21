@@ -11,6 +11,8 @@ jobs:
       steps:
         - name: 'Checkout source code'
           uses: actions/checkout@v2
+          with:
+            fetch-depth: 0
         - name: 'Install Salesforce CLI'
           run: |
               wget https://developer.salesforce.com/media/salesforce-cli/sfdx/channels/stable/sfdx-linux-x64.tar.xz
